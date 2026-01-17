@@ -1,0 +1,15 @@
+{
+  "tests": [
+    {
+      "name": "Get data from Google Sheets",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "violators": "array",
+        "violations": "array"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

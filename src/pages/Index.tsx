@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,33 +32,44 @@ interface Violation {
 
 const Index = () => {
   const { toast } = useToast();
-  const [violators, setViolators] = useState<Violator[]>([
-    { id: '1', fullName: 'Иванов Иван Иванович', position: 'Специалист', department: 'Отдел продаж', employeeId: 'EMP001' },
-    { id: '2', fullName: 'Петрова Мария Сергеевна', position: 'Менеджер', department: 'Отдел маркетинга', employeeId: 'EMP002' },
-  ]);
+  const [violators, setViolators] = useState<Violator[]>([]);
+  const [violations, setViolations] = useState<Violation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [violations, setViolations] = useState<Violation[]>([
-    {
-      id: '1',
-      violatorId: '1',
-      violatorName: 'Иванов Иван Иванович',
-      violationType: 'Опоздание',
-      date: '2024-01-15',
-      description: 'Опоздание на работу на 30 минут без уважительной причины',
-      penalty: 'Замечание',
-      status: 'active'
-    },
-    {
-      id: '2',
-      violatorId: '2',
-      violatorName: 'Петрова Мария Сергеевна',
-      violationType: 'Нарушение дресс-кода',
-      date: '2024-01-10',
-      description: 'Несоответствие корпоративному дресс-коду',
-      penalty: 'Выговор',
-      status: 'closed'
-    },
-  ]);
+  useEffect(() => {
+    fetchDataFromSheets();
+  }, []);
+
+  const fetchDataFromSheets = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('https://functions.poehali.dev/470cbbec-f2dc-44bb-9ef7-47a6f34289c8');
+      const data = await response.json();
+      
+      if (data.violators && Array.isArray(data.violators)) {
+        const validViolators = data.violators.filter((v: Violator) => v.fullName && v.fullName.trim() !== '');
+        setViolators(validViolators);
+      }
+      
+      if (data.violations && Array.isArray(data.violations)) {
+        const validViolations = data.violations.filter((v: Violation) => v.violatorName && v.violatorName.trim() !== '');
+        setViolations(validViolations);
+      }
+      
+      toast({
+        title: 'Данные загружены',
+        description: `Получено записей: ${data.violators?.length || 0}`
+      });
+    } catch (error) {
+      toast({
+        title: 'Ошибка загрузки',
+        description: 'Не удалось загрузить данные из таблицы',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const [newViolator, setNewViolator] = useState({
     fullName: '',
@@ -155,14 +166,20 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-              <Icon name="Shield" className="h-6 w-6 text-primary-foreground" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
+                <Icon name="Shield" className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Система управления дисциплинарными взысканиями</h1>
+                <p className="text-sm text-muted-foreground">Учет нарушений и назначение взысканий</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Система управления дисциплинарными взысканиями</h1>
-              <p className="text-sm text-muted-foreground">Учет нарушений и назначение взысканий</p>
-            </div>
+            <Button onClick={fetchDataFromSheets} disabled={isLoading} variant="outline" size="sm">
+              <Icon name="RefreshCw" className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              {isLoading ? 'Загрузка...' : 'Обновить данные'}
+            </Button>
           </div>
         </div>
       </header>
@@ -274,24 +291,35 @@ const Index = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ФИО</TableHead>
-                    <TableHead>Должность</TableHead>
-                    <TableHead>Отдел</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {violators.map((violator) => (
-                    <TableRow key={violator.id}>
-                      <TableCell className="font-medium">{violator.fullName}</TableCell>
-                      <TableCell>{violator.position}</TableCell>
-                      <TableCell>{violator.department}</TableCell>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Icon name="Loader2" className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : violators.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Icon name="Users" className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Нет данных о нарушителях</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ФИО</TableHead>
+                      <TableHead>Должность</TableHead>
+                      <TableHead>Отдел</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {violators.map((violator) => (
+                      <TableRow key={violator.id}>
+                        <TableCell className="font-medium">{violator.fullName}</TableCell>
+                        <TableCell>{violator.position}</TableCell>
+                        <TableCell>{violator.department}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
 
@@ -385,27 +413,38 @@ const Index = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {violations.map((violation) => (
-                  <div key={violation.id} className="rounded-lg border p-4 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h4 className="font-semibold text-foreground">{violation.violatorName}</h4>
-                        <p className="text-sm text-muted-foreground">{violation.violationType}</p>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Icon name="Loader2" className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : violations.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Icon name="FileText" className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Нет данных о взысканиях</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {violations.map((violation) => (
+                    <div key={violation.id} className="rounded-lg border p-4 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h4 className="font-semibold text-foreground">{violation.violatorName}</h4>
+                          <p className="text-sm text-muted-foreground">{violation.violationType}</p>
+                        </div>
+                        {getStatusBadge(violation.status)}
                       </div>
-                      {getStatusBadge(violation.status)}
+                      <p className="text-sm text-foreground mb-2">{violation.description}</p>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Icon name="Calendar" className="h-3 w-3" />
+                          {new Date(violation.date).toLocaleDateString('ru-RU')}
+                        </span>
+                        <span className="font-medium text-accent">{violation.penalty}</span>
+                      </div>
                     </div>
-                    <p className="text-sm text-foreground mb-2">{violation.description}</p>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Icon name="Calendar" className="h-3 w-3" />
-                        {new Date(violation.date).toLocaleDateString('ru-RU')}
-                      </span>
-                      <span className="font-medium text-accent">{violation.penalty}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
